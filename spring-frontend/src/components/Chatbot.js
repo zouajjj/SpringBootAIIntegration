@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-// import './Chatbot.css'; // for later
+import React, { useState, useEffect, useRef } from 'react';
 
 function Chatbot() {
     const [inputMessage, setInputMessage] = useState('');
@@ -7,42 +6,83 @@ function Chatbot() {
     const [isGenerating, setIsGenerating] = useState(false);
     const [error, setError] = useState(null);
 
+    // Store the active requestId and polling interval so we can cancel them
+    const pollingInterval = useRef(null);
+    const activeRequestId = useRef(null);
+
+    // stop polling when component is unmounted
+    useEffect(() => {
+        return () => stopPolling();
+    }, []);
+
+    const stopPolling = () => {
+        if (pollingInterval.current) {
+            clearInterval(pollingInterval.current);
+            pollingInterval.current = null;
+        }
+    };
+
+    const pollForResponse = (requestId) => {
+        pollingInterval.current = setInterval(async () => {
+            if (activeRequestId.current !== requestId) {
+                stopPolling();
+                return;
+            }
+
+            try {
+                const res = await fetch(`/ai/response/${requestId}`);
+                if (!res.ok) throw new Error(`Poll failed: ${res.status}`);
+
+                const json = await res.json();
+                console.log("poll response:", json) //testing polling time out
+
+                if (json.status === 'complete') {
+                    stopPolling();
+                    setResponseText(json.answer);
+                    setIsGenerating(false);
+                }
+
+            } catch (err) {
+                stopPolling();
+                setError("Lost connection while waiting for response.");
+                setIsGenerating(false);
+                console.error("Polling error:", err);
+            }
+        }, 2000); // poll every 2 seconds
+    };
+
     const handleGenerate = async (e) => {
         e.preventDefault();
         if (!inputMessage.trim()) return;
 
+        // Cancel any previous in-flight request
+        stopPolling();
         setIsGenerating(true);
         setError(null);
         setResponseText('');
 
         try {
             const params = new URLSearchParams({ message: inputMessage });
-            const response = await fetch(`/ai/generate?${params}`, {
-                method: 'GET'
-            });
+            const res = await fetch(`/ai/generate?${params}`, { method: 'GET' });
 
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+            if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+
+            const json = await res.json();
+
+            if (!json.requestId) {
+                setError("Server did not return a requestId.");
+
+                setIsGenerating(false);
+                return;
             }
 
-            const json = await response.json();
+            // Store requestId and begin polling
+            activeRequestId.current = json.requestId;
+            pollForResponse(json.requestId);
 
-            // The sample controller returns Map.of("generation", text)
-            // We safely extract the string
-            const generatedText = json['generation'];
-
-            if (generatedText) {
-                setResponseText(generatedText);
-            } else if (json['error'] || json['message']) {
-                setError(json['error'] || json['message']);
-            } else {
-                setError("Unknown response format");
-            }
-
-        } catch (error) {
-            console.error("Error fetching data:", error);
-            setError("Failed to generate response. Check console.");
-        } finally {
+        } catch (err) {
+            console.error("Error sending message:", err);
+            setError("Failed to send message. Check console.");
             setIsGenerating(false);
         }
     };
@@ -61,7 +101,7 @@ function Chatbot() {
                     className="chat-input"
                 />
                 <button type="submit" disabled={isGenerating} className="chat-btn">
-                    {isGenerating ? 'Generating...' : 'Generate'}
+                    {isGenerating ? 'Waiting for response...' : 'Generate'}
                 </button>
             </form>
 
@@ -73,8 +113,7 @@ function Chatbot() {
                     <div className="response-content">
                         <h3>Response:</h3>
                         <div className="response-text">
-                            {/* Optional: Simple formatting for newlines */}
-                            {responseText.split('\\n').map((line, index) => (
+                            {responseText.split('\n').map((line, index) => (
                                 <div key={index}>{line}</div>
                             ))}
                         </div>
@@ -88,7 +127,9 @@ function Chatbot() {
                 )}
 
                 {isGenerating && !responseText && (
-                    <div className="loading-text">Thinking...</div>
+                    <div className="loading-text">
+                        Processing via Kafka... this may take a moment.
+                    </div>
                 )}
             </div>
         </div>
