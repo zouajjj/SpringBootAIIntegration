@@ -1,0 +1,8 @@
+**/node_modules
+**/target
+**/build
+.git
+.idea
+.mvn/wrapper/maven-wrapper.jar
+*.md
+!README.md

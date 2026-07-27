@@ -34,3 +34,6 @@ build/
 
 ### Personal working notes ###
 DEV_LOG.md
+
+### Secrets ###
+.env

@@ -26,4 +26,9 @@ description: Make the ChatIntegrationZoya stack (Kafka + Spring Boot app + optio
 6. Decide + implement the frontend approach (baked into the jar vs its own container) and document the decision in the README.
 
 ## Status
-Not started. Depends on Docker + Kafka being available locally (user runs these manually before we start).
+Done and verified. Decisions actually taken:
+- Kafka: switched to `confluentinc/cp-kafka:7.6.1` + `confluentinc/cp-zookeeper:7.6.1` (not the apache/kafka KRaft fix — chose the Confluent images for interview recognizability, per explicit choice over the apache/kafka KRaft-fix alternative).
+- Frontend: baked into the Spring Boot jar via a 3-stage Dockerfile (node build → maven build with the CRA `build/` copied into `src/main/resources/static` → slim JRE runtime), not a separate container.
+- Gotcha hit and fixed: the zookeeper healthcheck can't use the `ruok` four-letter command — it's disabled by default in this image and, unlike what some docs claim, `ZOOKEEPER_4LW_COMMANDS_WHITELIST` isn't wired up in this image's config template at all (verified by reading `/etc/confluent/docker/zookeeper.properties.template` inside the container — no mapping for it exists). Healthcheck uses `srvr` instead, which is enabled by default and gives an equivalent liveness signal.
+- Verified live: `docker compose up -d` boots zookeeper → kafka → app healthy in order; `GET /ai/generate` → Kafka → Groq → `GET /ai/response/{id}` round trip confirmed working through the containerized stack; baked-in frontend serves at `/`.
+- Not yet committed to git — code changes are sitting in the working tree pending user go-ahead to commit.
