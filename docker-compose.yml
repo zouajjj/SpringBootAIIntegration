@@ -38,16 +38,27 @@ services:
       timeout: 5s
       retries: 10
 
-  app:
+  api-service:
     build:
       context: .
-      dockerfile: Dockerfile
-    container_name: chat-integration-app
+      dockerfile: api-service/Dockerfile
+    container_name: api-service
     depends_on:
       kafka:
         condition: service_healthy
     ports:
       - "8080:8080"
+    environment:
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+
+  worker-service:
+    build:
+      context: .
+      dockerfile: worker-service/Dockerfile
+    container_name: worker-service
+    depends_on:
+      kafka:
+        condition: service_healthy
     environment:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       GROQ_API_KEY: ${GROQ_API_KEY}

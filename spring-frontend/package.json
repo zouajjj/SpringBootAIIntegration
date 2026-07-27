@@ -14,7 +14,7 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "build": "react-scripts build && npx cpy \"build/**\" \"../ChatIntegrationZoya/src/main/resources/static\" --cwd=.",
+    "build": "react-scripts build && npx cpy \"build/**\" \"../api-service/src/main/resources/static\" --cwd=.",
     "start": "react-scripts start",
     "test": "react-scripts test",
     "eject": "react-scripts eject"

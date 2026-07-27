@@ -25,4 +25,13 @@ description: Split the single ChatIntegrationZoya Spring Boot module into api-se
 6. Update README with the architecture diagram and the Eureka-vs-Compose-networking tradeoff writeup — this is a real interview talking point, make it visible.
 
 ## Status
-Not started. Depends on [[containerize-stack]] being functional enough to test against (need a working Kafka broker to verify the new `chat-responses` round trip).
+Done and verified. Decisions actually taken:
+- Two fully independent Maven projects (`api-service/`, `worker-service/`), not a multi-module reactor build — each has its own `pom.xml`, own `src/`, own `Dockerfile`.
+- Result store: kept the in-memory `ConcurrentHashMap` in `api-service`'s `ChatController` as-is (deliberately deferred Redis/Postgres — noted as future work, not a gap).
+- `api-service`: `ChatController` (producer to `user-questions`, `GET /ai/response/{id}`) + new `ChatResponseListener` (`@KafkaListener` on `chat-responses`, group `api-service`) that replaces the old direct `chatController.storeResponse(...)` call. Frontend still baked into this service's jar since it's the one with the HTTP surface. No `spring-ai` dependency here anymore — it never actually needed it (the old `ChatResponse` import was dead code).
+- `worker-service`: `ChatWorker` (`@KafkaListener` on `user-questions`, group `worker-service`) calls the LLM and now **publishes to `chat-responses`** instead of reaching into `ChatController` directly — this was the real fix, not just a file move. No HTTP surface (`spring.main.web-application-type=none`), only `worker-service` gets `GROQ_API_KEY` now (scoped secret, `api-service` doesn't need it).
+- `docker-compose.yml` updated: `app` service replaced by `api-service` + `worker-service`, both depending on kafka healthy.
+- Verified live, and verified meaningfully: hit `/ai/generate` on `api-service`, watched `worker-service`'s logs show `Published answer for ID: ...` and `api-service`'s `ChatResponseListener` logs show `Stored answer for requestId: ...` — confirmed via logs that the answer crossed the network as a real Kafka message between two separate containers, not an in-process call (which is now structurally impossible since they're different JVMs).
+- Gotcha hit: a leftover container from the pre-split single-service stack was still bound to port 8080, so `api-service` silently started without its port mapping on the first `docker compose up`. Fixed by removing the stale container and force-recreating.
+- Old root-level single-module project (`pom.xml`, `src/`, `Dockerfile`, `mvnw`) deleted via `git rm` — fully superseded, not left around as dead code.
+- Committed to the chore branch, pending final confirmation.
