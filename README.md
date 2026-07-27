@@ -1,5 +1,4 @@
-# ChatIntegrationZoya
-
+# AIn't
 An async, Kafka-driven chat backend split into two independent Spring Boot microservices, fronted by a React UI, containerized end to end with Docker Compose.
 
 ## Why I built this
@@ -7,7 +6,7 @@ An async, Kafka-driven chat backend split into two independent Spring Boot micro
 This is a play project, not a production app. I built it to get hands-on with the pieces that actually show up in real distributed systems, on purpose, one at a time:
 
 - **Microservices architecture.** Splitting a single "does everything" service into two independently deployable services (`api-service` and `worker-service`) that only talk to each other through a message queue, never directly.
-- **Spring AI + LLM inference.** Wiring up Spring's AI abstractions against a real hosted model (Groq, via its OpenAI-compatible API) instead of a toy/mock client, and treating async inference as a queue-backed job instead of a blocking HTTP call.
+- **Spring AI + LLM inference.** Wiring up Spring's AI abstractions against a real hosted model (Groq, via its OpenAI-compatible API) and treating async inference as a queue-backed job instead of a blocking HTTP call.
 - **Cloud-style service architecture.** Docker Compose orchestration with real healthchecks and startup ordering, environment-driven config instead of hardcoded hosts, secrets kept out of the image.
 
 ## Architecture
